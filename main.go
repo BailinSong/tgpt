@@ -13,10 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
-	"github.com/olekukonko/ts"
 	"net/http"
 )
 
@@ -231,91 +228,21 @@ func main() {
 		os.Exit(0)
 	}
 
+	loadingFlag := false
+	go loading(&loadingFlag)
 	getData([]interface{}{
 		map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
 		map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
 	}, func(s string) {
+		loadingFlag = true
 		fmt.Print(s)
 	})
 
 }
 
-type errMsg error
-
-type model struct {
-	textarea textarea.Model
-	err      error
-}
-
-func initialModel() model {
-	size, _ := ts.GetSize()
-	termWidth := size.Col()
-	ti := textarea.New()
-	ti.SetWidth(termWidth)
-	ti.CharLimit = 200000
-	ti.ShowLineNumbers = false
-	ti.Placeholder = "Enter your prompt"
-	ti.Focus()
-
-	return model{
-		textarea: ti,
-		err:      nil,
-	}
-}
-
 func hasDataInStdin() bool {
 	stat, _ := os.Stdin.Stat()
 	return (stat.Mode() & os.ModeCharDevice) == 0
-}
-
-func (m model) Init() tea.Cmd {
-	return textarea.Blink
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEsc:
-			if m.textarea.Focused() {
-				m.textarea.Blur()
-			}
-		case tea.KeyCtrlC:
-			programLoop = false
-			userInput = ""
-			return m, tea.Quit
-
-		case tea.KeyTab:
-			userInput = m.textarea.Value()
-
-			if len(userInput) > 1 {
-				m.textarea.Blur()
-				return m, tea.Quit
-			}
-
-		default:
-			if !m.textarea.Focused() {
-				cmd = m.textarea.Focus()
-				cmds = append(cmds, cmd)
-			}
-		}
-
-	// We handle errors just like any other message
-	case errMsg:
-		m.err = msg
-		return m, nil
-	}
-
-	m.textarea, cmd = m.textarea.Update(msg)
-	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...)
-}
-
-func (m model) View() string {
-	return m.textarea.View()
 }
 
 func printProgramDescription() {

@@ -151,6 +151,7 @@ func loading(stop *bool) {
 	i := 0
 	for {
 		if *stop {
+			fmt.Print("\r             \r")
 			break
 		}
 		fmt.Printf("\r%s Loading", spinChars[i])
