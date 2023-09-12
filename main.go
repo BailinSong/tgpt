@@ -116,6 +116,8 @@ func main() {
 		if canRead(err, fileInfo) {
 			messages.load(memory)
 		}
+	} else {
+		messages.AddSystemMessage(systemRole)
 	}
 
 	prompt := ""
@@ -250,7 +252,8 @@ func hasDataInStdin() bool {
 }
 
 func printProgramDescription() {
-	fmt.Println("tgpt [option] <prompt|stdin>\n")
+	fmt.Println("Usage:")
+	fmt.Println("  tgpt [option] <prompt|stdin>\n")
 	fmt.Println("DESCRIPTION:")
 	fmt.Println("  tgpt is a tool for interacting with the GPT-3.5 language model by OpenAI.\n")
 	fmt.Println("OPTIONS:")

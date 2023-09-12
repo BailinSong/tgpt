@@ -1,115 +1,47 @@
 <p align="center"><img src="tgpt.svg"></p>
 
-# Terminal GPT (tgpt) 🚀
+# Terminal GPT (tgpt) 
 
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/aandrew-me/tgpt)](https://github.com/aandrew-me/tgpt)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/aandrew-me/tgpt)](https://github.com/aandrew-me/tgpt/releases/latest)
-[![AUR version](https://img.shields.io/aur/version/tgpt-bin?label=AUR%3A%20tgpt-bin)](https://aur.archlinux.org/packages/tgpt-bin)
-[![Chocolatey Version](https://img.shields.io/chocolatey/v/tgpt)](https://community.chocolatey.org/packages/tgpt)
+tgpt is a cross-platform command-line interface (CLI) tool that allows you to use ChatGPT 3.5 in your Terminal without requiring API keys. Modification based on [aandrew-me/tgpt](https://github.com/aandrew-me/tgpt).Thanks to the original author.
 
-tgpt is a cross-platform command-line interface (CLI) tool that allows you to use ChatGPT 3.5 in your Terminal without requiring API keys. 
-
-## Usage 💬
+## Usage 
 
 ```bash
-Usage: tgpt [Flag] [Prompt]
+Usage:
+  tgpt [option] <prompt|stdin>
 
-Flags:
--s, --shell                                        Generate and Execute shell commands. (Experimental) 
--c, --code                                         Generate Code. (Experimental)
--q, --quiet                                        Gives response back without loading animation
--w, --whole                                        Gives response back as a whole text
+DESCRIPTION:
+  tgpt is a tool for interacting with the GPT-3.5 language model by OpenAI.
 
-Options:
--f, --forget                                       Forget Chat ID 
--v, --version                                      Print version 
--h, --help                                         Print help message 
--i, --interactive                                  Start normal interactive mode 
--m, --multiline                                    Start multi-line interactive mode 
--cl, --changelog                                   See changelog of versions 
--u, --update                                       Update program 
+OPTIONS:
+      --ai-name string       Set AI name.
+  -h, --help                 Print this message.
+  -i, --interactive          Start normal interactive mode.
+  -m, --memory string        Start with a memory file or start with a new memory file.
+  -q, --quiet                Gives response back without loading animation.
+  -r, --refresh              Refresh auth key.
+      --system-rule string   Customized rule using system role support text or file path.
+      --user-name string     Set user name.
+  -v, --version              Print version.
+  -w, --whole                Gives response back as a whole text.
+
 
 Examples:
 tgpt "What is internet?"
-tgpt -f
-tgpt -m
-tgpt -s "How to update my system?"
+echo "What is internet?" | tgpt 
+tgpt -w "What is internet?"
+echo "What is internet?" |tgpt -w
+tgpt --system-rule code.rule "golang Hello, World!"
+tgpt --system-rule "Add ‘~~~’ at the end of the reply" "hello"
+tgpt --memory "chat01" --system-rule "Add ‘~~~’ at the end of the reply" "your name is Cindy"
+tgpt --memory "chat01" "what is your name"
+tgpt --ai-name "Cindy" "what is your name"
+tgpt --user-name "Tom" "who am i"
+tgpt -i --user-name "Tom" --ai-name "Cindy" --memory "chat02" --system-rule "Add ‘~~~’ at the end of the reply"
+
+
+
 ```
-
-![demo](https://user-images.githubusercontent.com/66430340/233759296-c4cf8cf2-0cab-48aa-9e84-40765b823282.gif)
-
-## Installation ⏬
-
-### Download for GNU/Linux 🐧 or MacOS 🍎
-
-The default download location is `/usr/local/bin`, but you can change it in the command to use a different location. However, make sure the location is added to your PATH environment variable for easy accessibility.
-
-You can download it with the following command:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/aandrew-me/tgpt/main/install | bash -s /usr/local/bin
-```
-
-If you are using Arch Linux, you can install the [AUR package](https://aur.archlinux.org/packages/tgpt-bin) with `paru`:
-
-```bash
-paru -S tgpt-bin
-```
-
-Or with `yay`:
-
-```bash
-yay -S tgpt-bin
-```
-
-### Install with Go
-
-```bash
-go install github.com/aandrew-me/tgpt@latest
-```
-
-### Windows 🪟
-
--   **Chocolatey:** You can install tgpt from [Chocolatey](https://community.chocolatey.org/packages/tgpt) using the following command:
-
-    ```bash
-    choco install tgpt
-    ```
-
--   **Scoop:** Package installation with [Scoop](https://scoop.sh/) can be done using the following command:
-
-    ```bash
-    scoop install https://raw.githubusercontent.com/aandrew-me/tgpt/main/tgpt.json
-    ```
-
-<!-- -   **PowerShell:** Open PowerShell as administrator and run the following command:
-    
-    ```bash
-    Invoke-WebRequest https://raw.githubusercontent.com/aandrew-me/tgpt/main/install-win.ps1 -OutFile "$PWD\install-win.ps1";  .\install-win.ps1
-    ```
-
-    If you receive an error stating "execution of scripts is disabled on this system," run this command instead (and confirm with a "Y"):
-
-    ```bash
-    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned; Invoke-WebRequest https://raw.githubusercontent.com/aandrew-me/tgpt/main/install-win.ps1 -OutFile "$PWD\install-win.ps1";  .\install-win.ps1
-    ``` -->
-
-### Proxy
-
-Support:
-- Http Proxy [ `http://ip:port` ]
-- Http Auth [ `http://user:pass@ip:port` ]
-- Socks5 Proxy [ `socks5://ip:port ]`
-- Socks5 Auth [ `socks5://user:pass@ip:port` ]
-
-If you want to use a proxy, create `config.txt` file in the same directory where the program is located and write your proxy configuration there.
-
-Example:
-
-```bash
-http://127.0.0.1:8080
-```
-
-### From Release
 
 You can download the executable for your operating system, rename it to `tgpt` (or any other desired name), and then execute it by typing `./tgpt` while in that directory. Alternatively, you can add it to your PATH environmental variable and then execute it by simply typing `tgpt`.
+
