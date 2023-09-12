@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 
@@ -21,16 +20,7 @@ const localVersion = "1.7.6"
 
 var bold = color.New(color.Bold)
 var boldBlue = color.New(color.Bold, color.FgBlue)
-var boldWhite = color.New(color.Bold, color.FgHiWhite)
-var boldViolet = color.New(color.Bold, color.FgMagenta)
-var codeText = color.New(color.BgBlack, color.FgGreen, color.Bold)
-var stopSpin = false
-
-var programLoop = true
-var serverID = ""
 var configDir = ""
-var userInput = ""
-var executablePath = ""
 var AUTH_KEY []byte
 
 func main() {
@@ -45,11 +35,9 @@ func main() {
 		help        bool
 		updateKey   bool
 		systemRole  string
-
-		memory string
-
-		name     string
-		userName string
+		memory      string
+		name        string
+		userName    string
 	)
 
 	flag.BoolVarP(&version, "version", "v", false, "Print version.")
@@ -57,19 +45,14 @@ func main() {
 	flag.BoolVarP(&quiet, "quiet", "q", false, "Gives response back without loading animation.")
 	flag.BoolVarP(&interactive, "interactive", "i", false, "Start normal interactive mode.")
 	flag.BoolVarP(&help, "help", "h", false, "Print this message.")
-	flag.BoolVarP(&updateKey, "refresh", "r", false, "refresh auth key.")
-	flag.StringVar(&systemRole, "system-rule", "", "Customized rule using system role supper text or file path.")
-	flag.StringVarP(&memory, "memory", "m", "", "Start with memories with file path.")
-	flag.StringVar(&name, "name", "", "set AI name.")
-	flag.StringVar(&userName, "user-name", "", "set user name.")
+	flag.BoolVarP(&updateKey, "refresh", "r", false, "Refresh auth key.")
+	flag.StringVar(&systemRole, "system-rule", "", "Customized rule using system role support text or file path.")
+	flag.StringVarP(&memory, "memory", "m", "", "Start with a memory file or start with a new memory file.")
+	flag.StringVar(&name, "ai-name", "", "Set AI name.")
+	flag.StringVar(&userName, "user-name", "", "Set user name.")
 
 	flag.Parse()
 
-	execPath, err := os.Executable()
-
-	if err == nil {
-		executablePath = execPath
-	}
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
@@ -77,7 +60,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	configDir, err = os.UserConfigDir()
+	configDir, err := os.UserConfigDir()
 
 	configFile := configDir + "/gpt/.config.json"
 	configManager := NewConfigManager(configFile)
@@ -101,7 +84,6 @@ func main() {
 
 	if updateKey {
 		configData["AUTH_KEY"] = getKey()
-		configData["chat_1"] = []interface{}{}
 		fmt.Println("Updating configuration")
 		configManager.WriteConfig(configData)
 		os.Exit(0)
@@ -125,6 +107,15 @@ func main() {
 
 	if name != "" {
 		systemRole = "You name is " + name + "\n" + systemRole
+	}
+
+	messages := NewMessages()
+
+	if memory != "" {
+		fileInfo, err := os.Stat(memory)
+		if canRead(err, fileInfo) {
+			messages.load(memory)
+		}
 	}
 
 	prompt := ""
@@ -158,30 +149,33 @@ func main() {
 	}
 
 	if whole {
-		fmt.Println(strings.TrimSpace(getData([]interface{}{
-			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
-			map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
-		}, nil)))
+		messages.AddUserMessage(getSafeString(prompt))
+		assistantMessage := getData(messages, nil)
+		fmt.Println(strings.TrimSpace(assistantMessage))
+
+		if memory != "" {
+			messages.AddAssistantMessage(getSafeString(assistantMessage))
+			messages.save(memory)
+		}
 		os.Exit(0)
 	}
 
 	if quiet {
-		getData([]interface{}{
-			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
-			map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
-		}, func(s string) {
+		messages.AddUserMessage(getSafeString(prompt))
+		assistantMessage := getData(messages, func(s string) {
 			fmt.Print(s)
 		})
+		if memory != "" {
+			messages.AddAssistantMessage(getSafeString(assistantMessage))
+			messages.save(memory)
+		}
 		os.Exit(0)
 	}
 
 	if interactive {
+
 		reader := bufio.NewReader(os.Stdin)
 		bold.Print("Interactive mode started. Press Ctrl + C or type exit to quit.\n\n")
-
-		messages := []interface{}{
-			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
-		}
 
 		for {
 
@@ -211,15 +205,18 @@ func main() {
 						bold.Print("AI:")
 					}
 
-					item := map[string]interface{}{"role": "user", "content": getSafeString(input)}
-					messages = append(messages, item)
+					messages.AddUserMessage(getSafeString(input))
 					assistantMessage := getData(messages, func(s string) {
 						fmt.Print(s)
 					})
+					messages.AddAssistantMessage(getSafeString(assistantMessage))
 
-					item = map[string]interface{}{"role": "assistant", "content": getSafeString(assistantMessage)}
 					fmt.Print("\n\n")
-					messages = append(messages, item)
+
+					if memory != "" {
+						messages.save(memory)
+					}
+
 				}
 
 			}
@@ -230,13 +227,20 @@ func main() {
 
 	loadingFlag := false
 	go loading(&loadingFlag)
-	getData([]interface{}{
-		map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
-		map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
-	}, func(s string) {
-		loadingFlag = true
+	messages.AddUserMessage(getSafeString(prompt))
+	assistantMessage := getData(messages, func(s string) {
+
+		if !loadingFlag {
+			loadingFlag = true
+			fmt.Printf("\r                     \r")
+		}
 		fmt.Print(s)
 	})
+	if memory != "" {
+		messages.AddAssistantMessage(getSafeString(assistantMessage))
+		messages.save(memory)
+	}
+	os.Exit(0)
 
 }
 
@@ -254,37 +258,21 @@ func printProgramDescription() {
 }
 
 func getKey() string {
-	url := "https://raw.githubusercontent.com/aandrew-me/tgpt/main/main.go"
+	url := "https://raw.githubusercontent.com/aandrew-me/tgpt/main/imp.txt"
 
 	response, err := http.Get(url)
 	if err != nil {
-		fmt.Println("请求失败：", err)
+		fmt.Println("Request failed：", err)
 		return ""
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		fmt.Println("读取失败：", err)
+		fmt.Println("Failed to read：", err)
 		return ""
 	}
-	strBody := string(body)
-	pattern := `base64.StdEncoding.DecodeString\("([^"]+)"\)`
-
-	// 编译正则表达式
-	regex := regexp.MustCompile(pattern)
-
-	// 查找匹配的字符串
-	matches := regex.FindAllStringSubmatch(string(strBody), -1)
-
-	// 提取匹配的字符串
-	for _, match := range matches {
-		if len(match) >= 2 {
-			decodedString := match[1]
-			return decodedString
-		}
-	}
-	return ""
+	return string(body)
 }
 
 func getSafeString(value string) string {
@@ -296,7 +284,7 @@ func tryReadContent(value string) string {
 	if value != "" {
 		// 检查文件是否可读
 		fileInfo, err := os.Stat(value)
-		if err == nil && fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&0400 != 0 {
+		if canRead(err, fileInfo) {
 			// 打开文件
 			file, err := os.Open(value)
 			if err == nil {
@@ -317,6 +305,10 @@ func tryReadContent(value string) string {
 	}
 
 	return value
+}
+
+func canRead(err error, fileInfo os.FileInfo) bool {
+	return err == nil && fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&0400 != 0
 }
 
 //////////////////////////////

@@ -14,10 +14,6 @@ import (
 	tls_client "github.com/bogdanfinn/tls-client"
 )
 
-type Data struct {
-	Version string `json:"version"`
-}
-
 func newClient() (tls_client.HttpClient, error) {
 	jar := tls_client.NewCookieJar()
 	options := []tls_client.HttpClientOption{
@@ -48,7 +44,7 @@ func newClient() (tls_client.HttpClient, error) {
 	return tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
 }
 
-func getData(input []interface{}, callback func(string)) (fullText string) {
+func getData(input *Messages, callback func(string)) (fullText string) {
 
 	client, err := newClient()
 	if err != nil {
@@ -57,9 +53,9 @@ func getData(input []interface{}, callback func(string)) (fullText string) {
 	}
 
 	safeInput, _ := json.Marshal(input)
-	//[{"role":"user","content":%v}]
-	var data = strings.NewReader(fmt.Sprintf(`{"model":"gpt-3.5-turbo","messages":%v,
-	"stream":true}`, string(safeInput)))
+	//fmt.Println(string(safeInput))
+
+	var data = strings.NewReader(string(safeInput))
 
 	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", data)
 	if err != nil {
@@ -75,7 +71,7 @@ func getData(input []interface{}, callback func(string)) (fullText string) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		stopSpin = true
+
 		bold.Println("\rSome error has occurred. Check your internet connection.")
 		fmt.Println("\nError:", err)
 		os.Exit(0)
@@ -84,12 +80,14 @@ func getData(input []interface{}, callback func(string)) (fullText string) {
 
 	if code >= 400 {
 		bold.Println("\rSome error has occurred. Please try again")
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			fmt.Print(scanner.Text())
+		}
 		os.Exit(0)
 	}
 
 	defer resp.Body.Close()
-
-	stopSpin = true
 
 	scanner := bufio.NewScanner(resp.Body)
 
@@ -117,11 +115,6 @@ func getData(input []interface{}, callback func(string)) (fullText string) {
 				obj = splitLine[1]
 			}
 
-		}
-		type Data struct {
-			Delta struct {
-				Content string `json:"content"`
-			} `json:"delta"`
 		}
 
 		var d Response
@@ -151,7 +144,6 @@ func loading(stop *bool) {
 	i := 0
 	for {
 		if *stop {
-			fmt.Print("\r             \r")
 			break
 		}
 		fmt.Printf("\r%s Loading", spinChars[i])
@@ -223,15 +215,13 @@ func getCommand(shellPrompt string) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		stopSpin = true
+
 		bold.Println("\rSome error has occurred. Check your internet connection.")
 		fmt.Println("\nError:", err)
 		os.Exit(0)
 	}
 
 	defer resp.Body.Close()
-
-	stopSpin = true
 
 	code := resp.StatusCode
 
