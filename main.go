@@ -3,10 +3,13 @@ package main
 import (
 	"bufio"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	flag "github.com/spf13/pflag"
+	"io"
 	"os"
 	"os/signal"
-	"runtime"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -14,12 +17,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
 	"github.com/olekukonko/ts"
+	"net/http"
 )
 
 const localVersion = "1.7.6"
 
 var bold = color.New(color.Bold)
 var boldBlue = color.New(color.Bold, color.FgBlue)
+var boldWhite = color.New(color.Bold, color.FgHiWhite)
 var boldViolet = color.New(color.Bold, color.FgMagenta)
 var codeText = color.New(color.BgBlack, color.FgGreen, color.Bold)
 var stopSpin = false
@@ -32,8 +37,38 @@ var executablePath = ""
 var AUTH_KEY []byte
 
 func main() {
+
+	//fmt.Println(os.Args)
+
+	var (
+		version     bool
+		whole       bool
+		quiet       bool
+		interactive bool
+		help        bool
+		updateKey   bool
+		systemRole  string
+
+		memory string
+
+		name     string
+		userName string
+	)
+
+	flag.BoolVarP(&version, "version", "v", false, "Print version.")
+	flag.BoolVarP(&whole, "whole", "w", false, "Gives response back as a whole text.")
+	flag.BoolVarP(&quiet, "quiet", "q", false, "Gives response back without loading animation.")
+	flag.BoolVarP(&interactive, "interactive", "i", false, "Start normal interactive mode.")
+	flag.BoolVarP(&help, "help", "h", false, "Print this message.")
+	flag.BoolVarP(&updateKey, "refresh", "r", false, "refresh auth key.")
+	flag.StringVar(&systemRole, "system-rule", "", "Customized rule using system role supper text or file path.")
+	flag.StringVarP(&memory, "memory", "m", "", "Start with memories with file path.")
+	flag.StringVar(&name, "name", "", "set AI name.")
+	flag.StringVar(&userName, "user-name", "", "set user name.")
+
+	flag.Parse()
+
 	execPath, err := os.Executable()
-	AUTH_KEY, _ = base64.StdEncoding.DecodeString("QmVhcmVyIHNrLXVCckYxSHNpSHp5U3l4MlVtaFZQVDNCbGJrRkp5VUw5aUxhSmtxRXhEU0tOWDNBag==")
 
 	if err == nil {
 		executablePath = execPath
@@ -45,201 +80,165 @@ func main() {
 		os.Exit(0)
 	}()
 
-	hasConfig := true
 	configDir, err = os.UserConfigDir()
 
+	configFile := configDir + "/gpt/.config.json"
+	configManager := NewConfigManager(configFile)
+	defaultConfig := map[string]interface{}{
+		"AUTH_KEY": "",
+		"MEMORY":   map[string]interface{}{},
+		"SYSTEM":   map[string]interface{}{},
+	}
+	configData, err := configManager.ReadConfig(defaultConfig)
 	if err != nil {
-		hasConfig = false
+		fmt.Println("Unable to read configuration file:", err)
+		return
 	}
-	configTxtByte, err := os.ReadFile(configDir + "/tgpt/config.txt")
-	if err != nil {
-		hasConfig = false
+
+	if configData["AUTH_KEY"].(string) == "" {
+		configData["AUTH_KEY"] = getKey()
+		configManager.WriteConfig(configData)
 	}
-	chatId := ""
-	if hasConfig {
-		configArr := strings.Split(string(configTxtByte), ":")
-		if len(configArr) == 2 {
-			chatId = configArr[1]
+
+	AUTH_KEY, _ = base64.StdEncoding.DecodeString(configData["AUTH_KEY"].(string))
+
+	if updateKey {
+		configData["AUTH_KEY"] = getKey()
+		configData["chat_1"] = []interface{}{}
+		fmt.Println("Updating configuration")
+		configManager.WriteConfig(configData)
+		os.Exit(0)
+	}
+
+	if help {
+		printProgramDescription()
+		os.Exit(0)
+	}
+
+	if version {
+		fmt.Println("gpt", localVersion)
+		os.Exit(0)
+	}
+
+	systemRole = tryReadContent(systemRole)
+
+	if userName != "" {
+		systemRole = "User name is " + userName + "\n" + systemRole
+	}
+
+	if name != "" {
+		systemRole = "You name is " + name + "\n" + systemRole
+	}
+
+	prompt := ""
+	if hasDataInStdin() {
+		if interactive {
+			printProgramDescription()
+			os.Exit(0)
 		}
-	}
-	args := os.Args
-
-	if len(args) > 1 && len(args[1]) > 1 {
-		input := args[1]
-
-		if input == "-v" || input == "--version" {
-			fmt.Println("tgpt", localVersion)
-		} else if input == "-cl" || input == "--changelog" {
-			getVersionHistory()
-		} else if input == "-w" || input == "--whole" {
-			if len(args) > 2 && len(args[2]) > 1 {
-				prompt := args[2]
-				trimmedPrompt := strings.TrimSpace(prompt)
-				if len(trimmedPrompt) < 1 {
-					fmt.Println("You need to provide some text")
-					fmt.Println(`Example: tgpt -w "What is encryption?"`)
-					os.Exit(0)
-				}
-				getWholeText(trimmedPrompt, chatId, configDir+"/tgpt")
-			} else {
-				fmt.Println("You need to provide some text")
-				fmt.Println(`Example: tgpt -w "What is encryption?"`)
-				os.Exit(0)
-			}
-		} else if input == "-q" || input == "--quiet" {
-			if len(args) > 2 && len(args[2]) > 1 {
-				prompt := args[2]
-				trimmedPrompt := strings.TrimSpace(prompt)
-				if len(trimmedPrompt) < 1 {
-					fmt.Println("You need to provide some text")
-					fmt.Println(`Example: tgpt -q "What is encryption?"`)
-					os.Exit(0)
-				}
-				getSilentText(trimmedPrompt, chatId, configDir+"/tgpt")
-			} else {
-				fmt.Println("You need to provide some text")
-				fmt.Println(`Example: tgpt -q "What is encryption?"`)
-				os.Exit(0)
-			}
-		} else if input == "-s" || input == "--shell" {
-			if len(args) > 2 && len(args[2]) > 1 {
-				prompt := args[2]
-				go loading(&stopSpin)
-				trimmedPrompt := strings.TrimSpace(prompt)
-				if len(trimmedPrompt) < 1 {
-					fmt.Println("You need to provide some text")
-					fmt.Println(`Example: tgpt -s "How to update system"`)
-					os.Exit(0)
-				}
-				shellCommand(trimmedPrompt)
-			} else {
-				fmt.Println("You need to provide some text")
-				fmt.Println(`Example: tgpt -s "How to update system"`)
-				os.Exit(0)
-			}
-
-		} else if input == "-c" || input == "--code" {
-			if len(args) > 2 && len(args[2]) > 1 {
-				prompt := args[2]
-				trimmedPrompt := strings.TrimSpace(prompt)
-				if len(trimmedPrompt) < 1 {
-					fmt.Println("You need to provide some text")
-					fmt.Println(`Example: tgpt -c "Hello world in Python"`)
-					os.Exit(0)
-				}
-				codeGenerate(trimmedPrompt)
-			} else {
-				fmt.Println("You need to provide some text")
-				fmt.Println(`Example: tgpt -c "Hello world in Python"`)
-				os.Exit(0)
-			}
-		} else if input == "-u" || input == "--update" {
-			update()
-		} else if input == "-i" || input == "--interactive" {
-			/////////////////////
-			// Normal interactive
-			/////////////////////
-
-			reader := bufio.NewReader(os.Stdin)
-			bold.Print("Interactive mode started. Press Ctrl + C or type exit to quit.\n\n")
-			serverID = chatId
-			for {
-				boldBlue.Println("╭─ You")
-				boldBlue.Print("╰─> ")
-
-				input, err := reader.ReadString('\n')
-				if err != nil {
-					fmt.Println("Error reading input:", err)
-					break
-				}
-
-				if len(input) > 1 {
-					input = strings.TrimSpace(input)
-					if len(input) > 1 {
-						if input == "exit" {
-							bold.Println("Exiting...")
-							return
-						}
-						serverID = getData(input, serverID, configDir+"/tgpt", true)
-					}
-
-				}
-
-			}
-
-		} else if input == "-m" || input == "--multiline" {
-			/////////////////////
-			// Multiline interactive
-			/////////////////////
-			serverID = chatId
-
-			fmt.Print("\nPress Tab to submit and Ctrl + C to exit.\n")
-
-			for programLoop {
-				fmt.Print("\n")
-				p := tea.NewProgram(initialModel())
-				_, err := p.Run()
-
-				if err != nil {
-					fmt.Println(err)
-					os.Exit(0)
-				}
-				if len(userInput) > 0 {
-					serverID = getData(userInput, serverID, configDir+"/tgpt", true)
-				}
-
-			}
-
-		} else if input == "-f" || input == "--forget" {
-			error := os.Remove(configDir + "/tgpt/config.txt")
-			if error != nil {
-				fmt.Println("There is no history to remove")
-			} else {
-				fmt.Println("Chat history removed")
-			}
-		} else if strings.HasPrefix(input, "-") {
-			boldBlue.Println(`Usage: tgpt [Flag] [Prompt]`)
-
-			boldBlue.Println("\nFlags:")
-			fmt.Printf("%-50v Generate and Execute shell commands. (Experimental) \n", "-s, --shell")
-			fmt.Printf("%-50v Generate Code. (Experimental)\n", "-c, --code")
-			fmt.Printf("%-50v Gives response back without loading animation\n", "-q, --quiet")
-			fmt.Printf("%-50v Gives response back as a whole text\n", "-w, --whole")
-
-			boldBlue.Println("\nOptions:")
-			fmt.Printf("%-50v Forget Chat ID \n", "-f, --forget")
-			fmt.Printf("%-50v Print version \n", "-v, --version")
-			fmt.Printf("%-50v Print help message \n", "-h, --help")
-			fmt.Printf("%-50v Start normal interactive mode \n", "-i, --interactive")
-			fmt.Printf("%-50v Start multi-line interactive mode \n", "-m, --multiline")
-			fmt.Printf("%-50v See changelog of versions \n", "-cl, --changelog")
-
-			if runtime.GOOS != "windows" {
-				fmt.Printf("%-50v Update program \n", "-u, --update")
-			}
-
-			boldBlue.Println("\nExamples:")
-			fmt.Println(`tgpt "What is internet?"`)
-			fmt.Println("tgpt -f")
-			fmt.Println(`tgpt -m`)
-			fmt.Println(`tgpt -s "How to update my system?"`)
-		} else {
-			go loading(&stopSpin)
-			formattedInput := strings.TrimSpace(input)
-			getData(formattedInput, chatId, configDir+"/tgpt", false)
-		}
-
-	} else {
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
-		input := scanner.Text()
-		go loading(&stopSpin)
-		formattedInput := strings.TrimSpace(input)
-		getData(formattedInput, chatId, configDir+"/tgpt", false)
-	}
-}
+		prompt = scanner.Text()
+		prompt = strings.TrimSpace(flag.Args()[0])
+	} else {
+		switch len(flag.Args()) {
+		case 1:
+			prompt = flag.Args()[0]
+			prompt = strings.TrimSpace(flag.Args()[0])
+			break
+		case 0:
+			if interactive {
+				break
+			} else {
+				printProgramDescription()
+				os.Exit(0)
+			}
+		default:
+			printProgramDescription()
+			os.Exit(0)
 
-// Multiline input
+		}
+	}
+
+	if whole {
+		fmt.Println(strings.TrimSpace(getData([]interface{}{
+			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
+			map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
+		}, nil)))
+		os.Exit(0)
+	}
+
+	if quiet {
+		getData([]interface{}{
+			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
+			map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
+		}, func(s string) {
+			fmt.Print(s)
+		})
+		os.Exit(0)
+	}
+
+	if interactive {
+		reader := bufio.NewReader(os.Stdin)
+		bold.Print("Interactive mode started. Press Ctrl + C or type exit to quit.\n\n")
+
+		messages := []interface{}{
+			map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
+		}
+
+		for {
+
+			if userName != "" {
+				boldBlue.Print(userName + ":")
+			} else {
+				boldBlue.Print("YOU:")
+			}
+
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Error reading input:", err)
+				break
+			}
+
+			if len(input) > 1 {
+				input = strings.TrimSpace(input)
+				if len(input) > 1 {
+					if input == "exit" {
+						bold.Println("Exiting...")
+						return
+					}
+
+					if name != "" {
+						bold.Print(name + ":")
+					} else {
+						bold.Print("AI:")
+					}
+
+					item := map[string]interface{}{"role": "user", "content": getSafeString(input)}
+					messages = append(messages, item)
+					assistantMessage := getData(messages, func(s string) {
+						fmt.Print(s)
+					})
+
+					item = map[string]interface{}{"role": "assistant", "content": getSafeString(assistantMessage)}
+					fmt.Print("\n\n")
+					messages = append(messages, item)
+				}
+
+			}
+
+		}
+		os.Exit(0)
+	}
+
+	getData([]interface{}{
+		map[string]interface{}{"role": "system", "content": getSafeString(systemRole)},
+		map[string]interface{}{"role": "user", "content": getSafeString(prompt)},
+	}, func(s string) {
+		fmt.Print(s)
+	})
+
+}
 
 type errMsg error
 
@@ -262,6 +261,11 @@ func initialModel() model {
 		textarea: ti,
 		err:      nil,
 	}
+}
+
+func hasDataInStdin() bool {
+	stat, _ := os.Stdin.Stat()
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
 func (m model) Init() tea.Cmd {
@@ -312,6 +316,80 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	return m.textarea.View()
+}
+
+func printProgramDescription() {
+	fmt.Println("tgpt [option] <prompt|stdin>\n")
+	fmt.Println("DESCRIPTION:")
+	fmt.Println("  tgpt is a tool for interacting with the GPT-3.5 language model by OpenAI.\n")
+	fmt.Println("OPTIONS:")
+	flag.PrintDefaults()
+}
+
+func getKey() string {
+	url := "https://raw.githubusercontent.com/aandrew-me/tgpt/main/main.go"
+
+	response, err := http.Get(url)
+	if err != nil {
+		fmt.Println("请求失败：", err)
+		return ""
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Println("读取失败：", err)
+		return ""
+	}
+	strBody := string(body)
+	pattern := `base64.StdEncoding.DecodeString\("([^"]+)"\)`
+
+	// 编译正则表达式
+	regex := regexp.MustCompile(pattern)
+
+	// 查找匹配的字符串
+	matches := regex.FindAllStringSubmatch(string(strBody), -1)
+
+	// 提取匹配的字符串
+	for _, match := range matches {
+		if len(match) >= 2 {
+			decodedString := match[1]
+			return decodedString
+		}
+	}
+	return ""
+}
+
+func getSafeString(value string) string {
+	safe, _ := json.Marshal(value)
+	return strings.Trim(string(safe), "\"")
+}
+
+func tryReadContent(value string) string {
+	if value != "" {
+		// 检查文件是否可读
+		fileInfo, err := os.Stat(value)
+		if err == nil && fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&0400 != 0 {
+			// 打开文件
+			file, err := os.Open(value)
+			if err == nil {
+				// 读取文件内容
+				content, err := io.ReadAll(file)
+				file.Close() // 关闭文件
+				if err == nil {
+					// 将文件内容赋值给 value 变量
+					value = string(content)
+				}
+			}
+		} else if err != nil {
+			//不是文件保持value 不变
+		} else {
+			// 文件不可读，将 value 设置为空字符串
+			value = ""
+		}
+	}
+
+	return value
 }
 
 //////////////////////////////
