@@ -30,7 +30,7 @@ Examples:
 tgpt "What is internet?"
 echo "What is internet?" | tgpt 
 tgpt -w "What is internet?"
-echo "What is internet?" |tgpt -w
+echo "What is internet?" | tgpt -w
 tgpt --system-rule code.rule "golang Hello, World!"
 tgpt --system-rule "Add ‘~~~’ at the end of the reply" "hello"
 tgpt --memory "chat01" --system-rule "Add ‘~~~’ at the end of the reply" "your name is Cindy"
