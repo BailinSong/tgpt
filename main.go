@@ -16,11 +16,10 @@ import (
 	"net/http"
 )
 
-const localVersion = "1.7.6"
+const localVersion = "1.8.0"
 
 var bold = color.New(color.Bold)
 var boldBlue = color.New(color.Bold, color.FgBlue)
-var configDir = ""
 var AUTH_KEY []byte
 
 func main() {
@@ -28,16 +27,17 @@ func main() {
 	//fmt.Println(os.Args)
 
 	var (
-		version     bool
-		whole       bool
-		quiet       bool
-		interactive bool
-		help        bool
-		updateKey   bool
-		systemRole  string
-		memory      string
-		name        string
-		userName    string
+		version      bool
+		whole        bool
+		quiet        bool
+		interactive  bool
+		help         bool
+		updateKey    bool
+		printVersion bool
+		systemRole   string
+		memory       string
+		name         string
+		userName     string
 	)
 
 	flag.BoolVarP(&version, "version", "v", false, "Print version.")
@@ -50,8 +50,15 @@ func main() {
 	flag.StringVarP(&memory, "memory", "m", "", "Start with a memory file or start with a new memory file.")
 	flag.StringVar(&name, "ai-name", "", "Set AI name.")
 	flag.StringVar(&userName, "user-name", "", "Set user name.")
+	flag.BoolVarP(&printVersion, "version", "v", false, "Print version")
 
 	flag.Parse()
+
+	if printVersion {
+		println(localVersion)
+		println("Source Code:")
+		println("  https://github.com/BailinSong/tgpt.git")
+	}
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -254,14 +261,14 @@ func hasDataInStdin() bool {
 }
 
 func printProgramDescription() {
-	fmt.Println("Usage:")
+	fmt.Println("USAGE:")
 	fmt.Println("  tgpt [option] <prompt|stdin>\n")
 	fmt.Println("DESCRIPTION:")
 	fmt.Println("  tgpt is a tool for interacting with the GPT-3.5 language model by OpenAI.\n")
 	fmt.Println("OPTIONS:")
 	flag.PrintDefaults()
 	fmt.Println("")
-	fmt.Println("Examples:\n  tgpt -r\n  tgpt \"What is internet?\"\n  echo \"What is internet?\" | tgpt \n  tgpt -w \"What is internet?\"\n  echo \"What is internet?\" | tgpt -w\n  tgpt --system-rule code.rule \"golang Hello, World!\"\n  tgpt --system-rule \"Add ‘~~~’ at the end of the reply\" \"hello\"\n  tgpt --memory \"chat01\" --system-rule \"Add ‘~~~’ at the end of the reply\" \"your name is Cindy\"\n  tgpt --memory \"chat01\" \"what is your name\"\n  tgpt --ai-name \"Cindy\" \"what is your name\"\n  tgpt --user-name \"Tom\" \"who am i\"\n  tgpt -i --user-name \"Tom\" --ai-name \"Cindy\" --memory \"chat02\" --system-rule \"Add ‘~~~’ at the end of the reply\"")
+	fmt.Println("EXAMPLES:\n  tgpt -r\n  tgpt \"What is internet?\"\n  echo \"What is internet?\" | tgpt \n  tgpt -w \"What is internet?\"\n  echo \"What is internet?\" | tgpt -w\n  tgpt --system-rule code.rule \"golang Hello, World!\"\n  tgpt --system-rule \"Add ‘~~~’ at the end of the reply\" \"hello\"\n  tgpt --memory \"chat01\" --system-rule \"Add ‘~~~’ at the end of the reply\" \"your name is Cindy\"\n  tgpt --memory \"chat01\" \"what is your name\"\n  tgpt --ai-name \"Cindy\" \"what is your name\"\n  tgpt --user-name \"Tom\" \"who am i\"\n  tgpt -i --user-name \"Tom\" --ai-name \"Cindy\" --memory \"chat02\" --system-rule \"Add ‘~~~’ at the end of the reply\"")
 }
 
 func getKey() string {
