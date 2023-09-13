@@ -27,17 +27,16 @@ func main() {
 	//fmt.Println(os.Args)
 
 	var (
-		version      bool
-		whole        bool
-		quiet        bool
-		interactive  bool
-		help         bool
-		updateKey    bool
-		printVersion bool
-		systemRole   string
-		memory       string
-		name         string
-		userName     string
+		version     bool
+		whole       bool
+		quiet       bool
+		interactive bool
+		help        bool
+		updateKey   bool
+		systemRole  string
+		memory      string
+		name        string
+		userName    string
 	)
 
 	flag.BoolVarP(&version, "version", "v", false, "Print version.")
@@ -50,15 +49,8 @@ func main() {
 	flag.StringVarP(&memory, "memory", "m", "", "Start with a memory file or start with a new memory file.")
 	flag.StringVar(&name, "ai-name", "", "Set AI name.")
 	flag.StringVar(&userName, "user-name", "", "Set user name.")
-	flag.BoolVarP(&printVersion, "version", "v", false, "Print version")
 
 	flag.Parse()
-
-	if printVersion {
-		println(localVersion)
-		println("Source Code:")
-		println("  https://github.com/BailinSong/tgpt.git")
-	}
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -103,6 +95,8 @@ func main() {
 
 	if version {
 		fmt.Println("gpt", localVersion)
+		fmt.Println("Source Code:")
+		fmt.Println("  https://github.com/BailinSong/tgpt.git")
 		os.Exit(0)
 	}
 
