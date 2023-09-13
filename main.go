@@ -167,6 +167,7 @@ func main() {
 		assistantMessage := getData(messages, func(s string) {
 			fmt.Print(s)
 		})
+		fmt.Print("\n")
 		if memory != "" {
 			messages.AddAssistantMessage(getSafeString(assistantMessage))
 			messages.save(memory)
@@ -234,10 +235,11 @@ func main() {
 
 		if !loadingFlag {
 			loadingFlag = true
-			fmt.Printf("\r                     \r")
+			fmt.Print("\r                     \r")
 		}
 		fmt.Print(s)
 	})
+	fmt.Print("\n")
 	if memory != "" {
 		messages.AddAssistantMessage(getSafeString(assistantMessage))
 		messages.save(memory)
@@ -258,6 +260,8 @@ func printProgramDescription() {
 	fmt.Println("  tgpt is a tool for interacting with the GPT-3.5 language model by OpenAI.\n")
 	fmt.Println("OPTIONS:")
 	flag.PrintDefaults()
+	fmt.Println("")
+	fmt.Println("Examples:\n  tgpt -r\n  tgpt \"What is internet?\"\n  echo \"What is internet?\" | tgpt \n  tgpt -w \"What is internet?\"\n  echo \"What is internet?\" | tgpt -w\n  tgpt --system-rule code.rule \"golang Hello, World!\"\n  tgpt --system-rule \"Add ‘~~~’ at the end of the reply\" \"hello\"\n  tgpt --memory \"chat01\" --system-rule \"Add ‘~~~’ at the end of the reply\" \"your name is Cindy\"\n  tgpt --memory \"chat01\" \"what is your name\"\n  tgpt --ai-name \"Cindy\" \"what is your name\"\n  tgpt --user-name \"Tom\" \"who am i\"\n  tgpt -i --user-name \"Tom\" --ai-name \"Cindy\" --memory \"chat02\" --system-rule \"Add ‘~~~’ at the end of the reply\"")
 }
 
 func getKey() string {
