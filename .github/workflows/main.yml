@@ -1,9 +1,7 @@
 name: Build Go Project and Create Release
 on:
-  push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-      - 'v*'
+    push:
+        branches: [release]
 
 permissions:
     contents: write
