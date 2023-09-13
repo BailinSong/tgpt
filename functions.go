@@ -57,7 +57,7 @@ func getData(input *Messages, callback func(string)) (fullText string) {
 
 	var data = strings.NewReader(string(safeInput))
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", data)
+	req, err := http.NewRequest("POST", "https://gpt.s-stars.top/v1/chat/completions", data)
 	if err != nil {
 		fmt.Println("\nSome error has occurred.")
 		fmt.Println("Error:", err)
@@ -202,7 +202,7 @@ func getCommand(shellPrompt string) {
 	}
 	var data = strings.NewReader(fmt.Sprintf(`{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"%v"}],
 	"stream":true}`, shellPrompt))
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", data)
+	req, err := http.NewRequest("POST", "https://gpt.s-stars.top/v1/chat/completions", data)
 
 	if err != nil {
 		fmt.Println("\nSome error has occurred.")

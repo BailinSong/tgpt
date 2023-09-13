@@ -27,17 +27,18 @@ OPTIONS:
 
 
 Examples:
-tgpt "What is internet?"
-echo "What is internet?" | tgpt 
-tgpt -w "What is internet?"
-echo "What is internet?" | tgpt -w
-tgpt --system-rule code.rule "golang Hello, World!"
-tgpt --system-rule "Add ‘~~~’ at the end of the reply" "hello"
-tgpt --memory "chat01" --system-rule "Add ‘~~~’ at the end of the reply" "your name is Cindy"
-tgpt --memory "chat01" "what is your name"
-tgpt --ai-name "Cindy" "what is your name"
-tgpt --user-name "Tom" "who am i"
-tgpt -i --user-name "Tom" --ai-name "Cindy" --memory "chat02" --system-rule "Add ‘~~~’ at the end of the reply"
+  tgpt -r
+  tgpt "What is internet?"
+  echo "What is internet?" | tgpt 
+  tgpt -w "What is internet?"
+  echo "What is internet?" | tgpt -w
+  tgpt --system-rule code.rule "golang Hello, World!"
+  tgpt --system-rule "Add ‘~~~’ at the end of the reply" "hello"
+  tgpt --memory "chat01" --system-rule "Add ‘~~~’ at the end of the reply" "your name is Cindy"
+  tgpt --memory "chat01" "what is your name"
+  tgpt --ai-name "Cindy" "what is your name"
+  tgpt --user-name "Tom" "who am i"
+  tgpt -i --user-name "Tom" --ai-name "Cindy" --memory "chat02" --system-rule "Add ‘~~~’ at the end of the reply"
 
 
 
