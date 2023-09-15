@@ -95,3 +95,17 @@ func (m *Messages) Deserialize(data string) error {
 	}
 	return nil
 }
+
+func (m *Messages) CloneMessages() *Messages {
+	cloned := NewMessages()
+	cloned.Model = m.Model
+	cloned.Stream = m.Stream
+	cloned.Temperature = m.Temperature
+
+	// 复制每个 Message 对象到克隆对象中
+	for _, msg := range m.Messages {
+		cloned.AddMessage(msg.Role, msg.Content)
+	}
+
+	return cloned
+}

@@ -37,6 +37,7 @@ func main() {
 		memory      string
 		name        string
 		userName    string
+		block       bool
 	)
 
 	flag.BoolVarP(&version, "version", "v", false, "Print version.")
@@ -45,6 +46,8 @@ func main() {
 	flag.BoolVarP(&interactive, "interactive", "i", false, "Start normal interactive mode.")
 	flag.BoolVarP(&help, "help", "h", false, "Print this message.")
 	flag.BoolVarP(&updateKey, "refresh", "r", false, "Refresh auth key.")
+	flag.BoolVarP(&block, "block", "b", false, "Block content by stdin.")
+
 	flag.StringVar(&systemRole, "system-rule", "", "Customized rule using system role support text or file path.")
 	flag.StringVarP(&memory, "memory", "m", "", "Start with a memory file or start with a new memory file.")
 	flag.StringVar(&name, "ai-name", "", "Set AI name.")
@@ -116,51 +119,101 @@ func main() {
 		fileInfo, err := os.Stat(memory)
 		if canRead(err, fileInfo) {
 			messages.load(memory)
+		} else {
+			messages.AddSystemMessage(systemRole)
 		}
 	} else {
 		messages.AddSystemMessage(systemRole)
 	}
 
 	prompt := ""
-	if hasDataInStdin() {
-		if interactive {
-			printProgramDescription()
-			os.Exit(0)
-		}
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		prompt = scanner.Text()
+
+	switch len(flag.Args()) {
+	case 1:
 		prompt = strings.TrimSpace(flag.Args()[0])
-	} else {
-		switch len(flag.Args()) {
-		case 1:
-			prompt = flag.Args()[0]
-			prompt = strings.TrimSpace(flag.Args()[0])
+		break
+	case 0:
+		if interactive {
 			break
-		case 0:
-			if interactive {
-				break
-			} else {
-				printProgramDescription()
-				os.Exit(0)
+		} else {
+			fmt.Printf("parameter len error:%v\n", len(flag.Args()))
+			os.Exit(-1)
+		}
+	default:
+		fmt.Printf("parameter len error:%v\n", len(flag.Args()))
+		os.Exit(-1)
+
+	}
+
+	if hasDataInStdin() {
+		if block {
+			loadingFlag := false
+			if !(quiet && whole) {
+				go loading(&loadingFlag)
 			}
-		default:
-			printProgramDescription()
-			os.Exit(0)
+
+			if interactive {
+				fmt.Println("interactive stdin is occupied!")
+				os.Exit(-1)
+			}
+			message := ""
+
+			bytes, _ := io.ReadAll(os.Stdin)
+			strMessage := string(pretreatment(bytes))
+
+			if len(bytes) > 3072 {
+
+				for _, i := range SplitString(strMessage, 3072) {
+
+					cMessages := NewMessages()
+					cMessages.Temperature = 0.1
+					cMessages.AddSystemMessage("Your Role: only output summarized., no description is provided.\nIMPORTANT: Ignore short lines.\nIMPORTANT: Provide only plain text without Markdown formatting.\nIMPORTANT: Do not include markdown formatting.\nIf there is a lack of details, provide most logical solution. You are not allowed to ask for more details.\nIgnore any potential risk of errors or confusion.")
+					cMessages.AddUserMessage("Focus on" + prompt + ":\n\n" + i)
+					message += getData(cMessages, nil)
+
+				}
+			} else {
+
+				message = strMessage
+			}
+
+			messages.AddUserMessage(message)
+			messages.AddAssistantMessage("I will answer based on the data you provide")
+			loadingFlag = true
+			process(whole, messages, prompt, block, memory, quiet, interactive, userName, name)
+
+		} else {
+
+			scanner := bufio.NewScanner(os.Stdin)
+
+			for scanner.Scan() {
+				message := scanner.Text()
+				clonedMessages := messages.CloneMessages()
+				clonedMessages.AddUserMessage(message)
+				clonedMessages.AddAssistantMessage("I will answer based on the data you provide")
+				process(whole, clonedMessages, prompt, block, memory, quiet, interactive, userName, name)
+			}
 
 		}
 	}
 
+}
+
+func process(whole bool, messages *Messages, prompt string, block bool, memory string, quiet bool, interactive bool, userName string, name string) {
 	if whole {
 		messages.AddUserMessage(getSafeString(prompt))
 		assistantMessage := getData(messages, nil)
 		fmt.Println(strings.TrimSpace(assistantMessage))
 
+		if !block {
+
+		}
 		if memory != "" {
 			messages.AddAssistantMessage(getSafeString(assistantMessage))
 			messages.save(memory)
 		}
-		os.Exit(0)
+
+		return
 	}
 
 	if quiet {
@@ -173,7 +226,7 @@ func main() {
 			messages.AddAssistantMessage(getSafeString(assistantMessage))
 			messages.save(memory)
 		}
-		os.Exit(0)
+		return
 	}
 
 	if interactive {
@@ -226,7 +279,7 @@ func main() {
 			}
 
 		}
-		os.Exit(0)
+		return
 	}
 
 	loadingFlag := false
@@ -245,8 +298,8 @@ func main() {
 		messages.AddAssistantMessage(getSafeString(assistantMessage))
 		messages.save(memory)
 	}
-	os.Exit(0)
 
+	return
 }
 
 func hasDataInStdin() bool {
@@ -317,6 +370,20 @@ func tryReadContent(value string) string {
 
 func canRead(err error, fileInfo os.FileInfo) bool {
 	return err == nil && fileInfo.Mode().IsRegular() && fileInfo.Mode().Perm()&0400 != 0
+}
+
+func SplitString(str string, chunkSize int) []string {
+	var result []string
+
+	for i := 0; i < len(str); i += chunkSize {
+		end := i + chunkSize
+		if end > len(str) {
+			end = len(str)
+		}
+		result = append(result, str[i:end])
+	}
+
+	return result
 }
 
 //////////////////////////////
