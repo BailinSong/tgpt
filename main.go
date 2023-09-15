@@ -16,7 +16,7 @@ import (
 	"net/http"
 )
 
-const localVersion = "1.8.0"
+const localVersion = "1.9.0"
 
 var bold = color.New(color.Bold)
 var boldBlue = color.New(color.Bold, color.FgBlue)
@@ -86,7 +86,7 @@ func main() {
 
 	if updateKey {
 		configData["AUTH_KEY"] = getKey()
-		fmt.Println("Updating configuration")
+		fmt.Println("Updated configuration")
 		configManager.WriteConfig(configData)
 		os.Exit(0)
 	}
@@ -195,6 +195,9 @@ func main() {
 			}
 
 		}
+	} else {
+
+		process(whole, messages, prompt, block, memory, quiet, interactive, userName, name)
 	}
 
 }
